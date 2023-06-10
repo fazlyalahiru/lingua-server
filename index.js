@@ -2,6 +2,7 @@ const express = require('express');
 const app = express()
 const cors = require('cors');
 require('dotenv').config()
+const morgan = require('morgan')
 const port = process.env.PORT || 5000;
 const { ObjectId } = require('mongodb');
 const { MongoClient, ServerApiVersion } = require('mongodb');
@@ -9,6 +10,7 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 // Middleware 
 app.use(express.json())
 app.use(cors())
+app.use(morgan('tiny'))
 
 //MongoDB starts here
 
@@ -66,6 +68,17 @@ async function run() {
             res.send(result)
         })
 
+        // get all classes of an instructor
+        app.get('/classes/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                'instructorInfo.email': email
+            }
+            console.log(query);
+            const result = await classCollection.find(query).toArray();
+            res.send(result)
+        })
+
         // save enrolled class info
         app.post('/enrolls', async (req, res) => {
             const enrollInfo = req.body;
@@ -82,7 +95,7 @@ async function run() {
 
             if (existingEnrollment) {
                 res.status(400).json({ error: 'You have already enrolled for this class.' });
-                console.log("Card already enrolled:", existingEnrollment);
+
             } else {
                 const result = await enrollCollection.insertOne(enrollInfo)
                 res.status(200).json(result);
