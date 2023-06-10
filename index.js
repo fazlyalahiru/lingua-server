@@ -79,7 +79,7 @@ async function run() {
                 }
 
             );
-            // console.log(existingEnrollment);
+
             if (existingEnrollment) {
                 res.status(400).json({ error: 'You have already enrolled for this class.' });
                 console.log("Card already enrolled:", existingEnrollment);
@@ -88,6 +88,17 @@ async function run() {
                 res.status(200).json(result);
             }
 
+        })
+
+        // Get all enrolls by email
+        app.get('/enrolls', async (req, res) => {
+            const email = req.query.email;
+            if (!email) {
+                res.send([])
+            }
+            const query = { "userInfo.email": email }
+            const result = await enrollCollection.find(query).toArray()
+            res.send(result)
         })
 
 
