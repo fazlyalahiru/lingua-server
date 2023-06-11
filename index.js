@@ -1,7 +1,9 @@
 const express = require('express');
+var jwt = require('jsonwebtoken');
 const app = express()
 const cors = require('cors');
 require('dotenv').config()
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
 const morgan = require('morgan')
 const port = process.env.PORT || 5000;
 const { ObjectId } = require('mongodb');
@@ -26,11 +28,42 @@ const client = new MongoClient(uri, {
     }
 });
 
+// jwt middleware function 
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'Unauthorized access' })
+    }
+    const token = authorization.split(' ')[1]
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ error: true, message: 'Unauthorized access' })
+        }
+        else {
+            req.decoded = decoded;
+            next()
+        }
+    })
+
+}
 async function run() {
     try {
         const usersCollenction = client.db('linguaDb').collection('users')
         const classCollection = client.db('linguaDb').collection('classes')
+        const cartCollection = client.db('linguaDb').collection('carts')
         const enrollCollection = client.db('linguaDb').collection('enrolls')
+
+        // create json web token
+        app.post('/jwt', async (req, res) => {
+            const email = req.body;
+            const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
+                expiresIn: '1hr',
+            })
+
+
+            res.send({ token })
+            //**send token as object */
+        })
 
         // save user in database
         app.put('/users/:email', async (req, res) => {
@@ -69,13 +102,37 @@ async function run() {
         })
 
         // get all classes of an instructor
-        app.get('/classes/:email', async (req, res) => {
+        app.get('/classes/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ error: true, message: 'Forbiddedn Access' })
+            }
             const query = {
                 'instructorInfo.email': email
             }
             console.log(query);
             const result = await classCollection.find(query).toArray();
+            res.send(result)
+        })
+        app.put('/classes/:id', async (req, res) => {
+            const id = req.params.id;
+            try {
+                const result = await classCollection.updateOne(
+                    { classId: classId },
+                    { $set: { status: 'approved' } }
+                );
+                res.json({ success: true, message: 'Status updated to approved' });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        })
+        // delete an instructor specific class
+        app.delete('/classes/:id', async (req, res) => {
+            const id = req.params.id;
+
+            const query = { _id: new ObjectId(id) }
+            const result = await classCollection.deleteOne(query)
             res.send(result)
         })
 
@@ -120,6 +177,27 @@ async function run() {
             const result = await enrollCollection.deleteOne(query)
             res.send(result)
         })
+        // PaymentIntent with the order amount
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body;
+            console.log(price);
+            if (price) {
+                const amount = parseFloat(price * 100);
+                console.log(amount);
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: amount,
+                    currency: 'usd',
+                    payment_method_types: ['card']
+                });
+
+                res.send({
+                    clientSecret: paymentIntent.client_secret
+                })
+            }
+
+
+        })
+
 
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
