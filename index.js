@@ -50,8 +50,8 @@ async function run() {
     try {
         const usersCollenction = client.db('linguaDb').collection('users')
         const classCollection = client.db('linguaDb').collection('classes')
-        const cartCollection = client.db('linguaDb').collection('carts')
         const enrollCollection = client.db('linguaDb').collection('enrolls')
+        const cartCollection = client.db('linguaDb').collection('carts')
 
         // create json web token
         app.post('/jwt', async (req, res) => {
@@ -91,13 +91,21 @@ async function run() {
         app.post('/classes', async (req, res) => {
             const classInfo = req.body;
 
-            const result = await classCollection.insertOne(classInfo)
+
+            const updatedClassInfor = {
+                ...classInfo,
+                status: 'pending'
+            }
+
+            const result = await classCollection.insertOne(updatedClassInfor)
             res.send(result)
         })
 
         // find all classes
         app.get('/classes', async (req, res) => {
-            const result = await classCollection.find().toArray()
+            const status = req.query.status;
+            const query = status ? { status } : {}
+            const result = await classCollection.find(query).toArray()
             res.send(result)
         })
 
@@ -136,13 +144,13 @@ async function run() {
             res.send(result)
         })
 
-        // save enrolled class info
-        app.post('/enrolls', async (req, res) => {
+        // put a selected class in cartCollection
+        app.post('/cart', async (req, res) => {
             const enrollInfo = req.body;
             const uniqueId = new ObjectId();
             enrollInfo._id = uniqueId;
 
-            const existingEnrollment = await enrollCollection.findOne(
+            const existingEnrollment = await cartCollection.findOne(
                 {
                     classId: enrollInfo.classId,
                     "userInfo.email": enrollInfo.userInfo.email
@@ -154,35 +162,54 @@ async function run() {
                 res.status(400).json({ error: 'You have already enrolled for this class.' });
 
             } else {
-                const result = await enrollCollection.insertOne(enrollInfo)
+                const result = await cartCollection.insertOne(enrollInfo)
                 res.status(200).json(result);
             }
 
         })
 
-        // Get all enrolls by email
-        app.get('/enrolls', async (req, res) => {
+        // Get all the selected classes from cartCollection
+        app.get('/cart', async (req, res) => {
             const email = req.query.email;
             if (!email) {
                 res.send([])
             }
             const query = { "userInfo.email": email }
-            const result = await enrollCollection.find(query).toArray()
+            const result = await cartCollection.find(query).toArray()
             res.send(result)
         })
-        // delete an enrollment
-        app.delete('/enrolls/:id', async (req, res) => {
+        // delete a selected item from cartCollection
+        app.delete('/selectedClass/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
-            const result = await enrollCollection.deleteOne(query)
+            const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
+        // post paid class info to the mongodb
+        app.post('/enrolled', async (req, res) => {
+            const paymentInfo = req.body;
+
+            const result = await enrollCollection.insertOne(paymentInfo)
+            res.send(result)
+        })
+        // get enrolled class list
+        app.get('/enrolled', async (req, res) => {
+            const email = req.query.email;
+            console.log(email);
+            // if (!email) {
+            //     res.send([])
+            // }
+            const query = { "userInfo.email": email }
+            const result = await enrollCollection.find(query).sort({ sortedDate: -1 }).toArray()
+            res.send(result)
+        })
+
         // PaymentIntent with the order amount
-        app.post('/create-payment-intent', async (req, res) => {
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
             const { price } = req.body;
             console.log(price);
             if (price) {
-                const amount = parseFloat(price * 100);
+                const amount = parseFloat(price) * 100;
                 console.log(amount);
                 const paymentIntent = await stripe.paymentIntents.create({
                     amount: amount,
@@ -213,7 +240,7 @@ run().catch(console.dir);
 
 // MongoDB ends here
 app.get('/', (req, res) => {
-    res.send('Langua server is running')
+    res.send('Lingua server is running')
 })
 
 app.listen(port, (req, res) => {
