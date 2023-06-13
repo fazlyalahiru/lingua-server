@@ -229,6 +229,12 @@ async function run() {
             res.send(result)
         })
 
+        // top classes
+        app.get('/top-classes', async (req, res) => {
+            const result = await classCollection.find().sort({ enrolledStudent: -1 }).limit(6).toArray();
+            res.send(result)
+        })
+
         // put a selected class in cartCollection
         app.post('/cart', async (req, res) => {
             const enrollInfo = req.body;
@@ -288,6 +294,8 @@ async function run() {
             const result = await enrollCollection.find(query).sort({ sortedDate: -1 }).toArray()
             res.send(result)
         })
+
+        
 
         // PaymentIntent with the order amount
         app.post('/create-payment-intent', verifyJWT, async (req, res) => {
