@@ -92,6 +92,11 @@ async function run() {
             const result = await usersCollection.find().toArray()
             res.send(result)
         })
+        // get only instructor users
+        app.get('/instructors', async (req, res) => {
+            const instructors = await usersCollection.find({ role: 'instructor' }).toArray();
+            return res.json(instructors);
+        })
 
         // set instructor role
         app.post('/users/instructor/:id', async (req, res) => {
@@ -198,19 +203,24 @@ async function run() {
             const result = await classCollection.find(query).toArray();
             res.send(result)
         })
-        // app.put('/classes/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     try {
-        //         const result = await classCollection.updateOne(
-        //             { classId: classId },
-        //             { $set: { status: 'approved' } }
-        //         );
-        //         res.json({ success: true, message: 'Status updated to approved' });
-        //     } catch (error) {
-        //         res.status(500).json({ success: false, error: error.message });
-        //     }
-        // })
-        // delete an instructor specific class
+
+        // update class info (total seat, enrolled)
+        app.put('/update-classes/:id', async (req, res) => {
+            const courseId = req.params.id;
+
+            const updatedCourse = await classCollection.updateOne(
+                { _id: new ObjectId(courseId) }, //check this one
+                { $inc: { enrolledStudent: 1, totalSeat: -1 } }
+            );
+
+            if (updatedCourse.modifiedCount === 1) {
+                const updatedDocument = await classCollection.findOne({ _id: new ObjectId(courseId) });
+                return res.json(updatedDocument);
+            } else {
+                return res.status(500).json({ error: 'Failed to update course' });
+            }
+        })
+
         app.delete('/classes/:id', async (req, res) => {
             const id = req.params.id;
 
