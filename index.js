@@ -48,7 +48,7 @@ const verifyJWT = (req, res, next) => {
 }
 async function run() {
     try {
-        const usersCollenction = client.db('linguaDb').collection('users')
+        const usersCollection = client.db('linguaDb').collection('users')
         const classCollection = client.db('linguaDb').collection('classes')
         const enrollCollection = client.db('linguaDb').collection('enrolls')
         const cartCollection = client.db('linguaDb').collection('carts')
@@ -62,7 +62,7 @@ async function run() {
 
 
             res.send({ token })
-            //**send token as object */
+
         })
 
         // save user in database
@@ -74,7 +74,7 @@ async function run() {
             const updateDoc = {
                 $set: user
             }
-            const result = await usersCollenction.updateOne(query, updateDoc, options)
+            const result = await usersCollection.updateOne(query, updateDoc, options)
 
             res.send(result)
         })
@@ -83,9 +83,49 @@ async function run() {
         app.get('/users/:email', async (req, res) => {
             const email = req.params.email;
             const query = { email: email }
-            const result = await usersCollenction.findOne(query);
+            const result = await usersCollection.findOne(query);
             res.send(result)
         })
+
+        // find all users
+        app.get('/users', async (req, res) => {
+            const result = await usersCollection.find().toArray()
+            res.send(result)
+        })
+
+        // set instructor role
+        app.post('/users/instructor/:id', async (req, res) => {
+            const userId = req.params.id;
+
+            try {
+                const result = await usersCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    { $set: { role: 'instructor' } }
+                );
+
+                res.send(result);
+            } catch (error) {
+                console.error('Error approving class:', error);
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
+
+        // find admin classes
+        app.post('/users/admin/:id', async (req, res) => {
+            const userId = req.params.id;
+
+            try {
+                const result = await usersCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    { $set: { role: 'admin' } }
+                );
+
+                res.send(result);
+            } catch (error) {
+                console.error('Error approving class:', error);
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
 
         // Add a class to mongodb 
         app.post('/classes', async (req, res) => {
@@ -101,13 +141,48 @@ async function run() {
             res.send(result)
         })
 
-        // find all classes
+        // get all classes
         app.get('/classes', async (req, res) => {
             const status = req.query.status;
             const query = status ? { status } : {}
             const result = await classCollection.find(query).toArray()
             res.send(result)
         })
+
+        // find approve classes
+        app.post('/classes/approve/:id', async (req, res) => {
+            const classId = req.params.id;
+
+            try {
+                const result = await classCollection.updateOne(
+                    { _id: new ObjectId(classId) },
+                    { $set: { status: 'approved' } }
+                );
+
+                res.send(result);
+            } catch (error) {
+                console.error('Error approving class:', error);
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
+
+        // find deniyed classes
+        app.post('/classes/deny/:id', async (req, res) => {
+            const classId = req.params.id;
+            // const statusMessage = req.body.textBoxValue;
+            // console.log(statusMessage);
+            try {
+                const result = await classCollection.updateOne(
+                    { _id: new ObjectId(classId) },
+                    { $set: { status: 'denied' } }
+                );
+
+                res.send(result);
+            } catch (error) {
+                console.error('Error approving class:', error);
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
 
         // get all classes of an instructor
         app.get('/classes/:email', verifyJWT, async (req, res) => {
@@ -123,18 +198,18 @@ async function run() {
             const result = await classCollection.find(query).toArray();
             res.send(result)
         })
-        app.put('/classes/:id', async (req, res) => {
-            const id = req.params.id;
-            try {
-                const result = await classCollection.updateOne(
-                    { classId: classId },
-                    { $set: { status: 'approved' } }
-                );
-                res.json({ success: true, message: 'Status updated to approved' });
-            } catch (error) {
-                res.status(500).json({ success: false, error: error.message });
-            }
-        })
+        // app.put('/classes/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     try {
+        //         const result = await classCollection.updateOne(
+        //             { classId: classId },
+        //             { $set: { status: 'approved' } }
+        //         );
+        //         res.json({ success: true, message: 'Status updated to approved' });
+        //     } catch (error) {
+        //         res.status(500).json({ success: false, error: error.message });
+        //     }
+        // })
         // delete an instructor specific class
         app.delete('/classes/:id', async (req, res) => {
             const id = req.params.id;
@@ -169,7 +244,7 @@ async function run() {
         })
 
         // Get all the selected classes from cartCollection
-        app.get('/cart', async (req, res) => {
+        app.get('/cart', verifyJWT, async (req, res) => {
             const email = req.query.email;
             if (!email) {
                 res.send([])
@@ -193,7 +268,7 @@ async function run() {
             res.send(result)
         })
         // get enrolled class list
-        app.get('/enrolled', async (req, res) => {
+        app.get('/enrolled', verifyJWT, async (req, res) => {
             const email = req.query.email;
             console.log(email);
             // if (!email) {
