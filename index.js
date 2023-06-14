@@ -98,6 +98,12 @@ async function run() {
             return res.json(instructors);
         })
 
+        // top instructor
+        app.get('/top-instructors', async (req, res) => {
+            const instructors = await usersCollection.find({ role: 'instructor' }).limit(6).toArray();
+            return res.json(instructors);
+        })
+
         // set instructor role
         app.post('/users/instructor/:id', async (req, res) => {
             const userId = req.params.id;
@@ -114,6 +120,14 @@ async function run() {
                 res.status(500).json({ error: 'Internal Server Error' });
             }
         });
+
+        // find if a user is admin or not
+        app.get('/is-admin', async (req, res) => {
+            const userEmail = req.query.email;
+            console.log('this console is from index', userEmail);
+            const result = await usersCollection.findOne({ email: userEmail })
+            res.send(result)
+        })
 
         // find admin classes
         app.post('/users/admin/:id', async (req, res) => {
@@ -221,6 +235,20 @@ async function run() {
             }
         })
 
+        // update a class info 
+        app.put('/update-class-info/:id', async (req, res) => {
+            const id = req.params.id;
+            const classInfo = req.body;
+            console.log('this console from update class info', id, classInfo);
+            const filter = { _id: new ObjectId(id) }
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: classInfo
+            }
+            const result = await classCollection.updateOne(filter, updateDoc, options)
+            res.send(result)
+        })
+
         app.delete('/classes/:id', async (req, res) => {
             const id = req.params.id;
 
@@ -295,7 +323,7 @@ async function run() {
             res.send(result)
         })
 
-        
+
 
         // PaymentIntent with the order amount
         app.post('/create-payment-intent', verifyJWT, async (req, res) => {
