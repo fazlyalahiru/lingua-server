@@ -186,7 +186,7 @@ async function run() {
         // find deniyed classes
         app.post('/classes/deny/:id', async (req, res) => {
             const classId = req.params.id;
-           
+
             try {
                 const result = await classCollection.updateOne(
                     { _id: new ObjectId(classId) },
@@ -312,9 +312,6 @@ async function run() {
         app.get('/enrolled', verifyJWT, async (req, res) => {
             const email = req.query.email;
             console.log(email);
-            // if (!email) {
-            //     res.send([])
-            // }
             const query = { "userInfo.email": email }
             const result = await enrollCollection.find(query).sort({ sortedDate: -1 }).toArray()
             res.send(result)
@@ -346,7 +343,6 @@ async function run() {
         client.db("admin").command({ ping: 1 });
         console.log("Amazing! you just hit the MongoDB");
     } finally {
-        // Ensures that the client will close when you finish/error
         // await client.close();
     }
 }
